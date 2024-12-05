@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validação de Responsáveis</title>
+  <style>
+    /* Reset básico */
+    body, html {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+
+    h1 {
+      color: #1d44b8;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+    }
+
+    input[type="file"], select, button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #1d44b8;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #163a8e;
+    }
+
+    .log {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Validação de Responsáveis</h1>
+  <div class="container">
+    <label for="csv1">Upload da Planilha (Flying)</label>
+    <input type="file" id="csv1" accept=".csv">
+    
+    <label for="csv2">Upload da Planilha (Pipefy)</label>
+    <input type="file" id="csv2" accept=".csv">
+    
+    <label for="idColumn">Selecione a Coluna de ID</label>
+    <select id="idColumn">
+      <option value="">Selecione a coluna de ID</option>
+    </select>
+    
+    <label for="responsavelColumn">Selecione a Coluna de Responsável</label>
+    <select id="responsavelColumn">
+      <option value="">Selecione a coluna de Responsável</option>
+    </select>
+    
+    <button onclick="compareCSVs()">Comparar CSVs</button>
+    <button onclick="downloadReport()">Baixar Relatório</button>
+    
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    let flyingData = [];
+    let pipefyData = [];
+    let columns = [];
+    let result = [];
+
+    // Ler o CSV
+    function readCSV(file, callback) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const rows = reader.result.split("\n").map(row => row.split(","));
+        callback(rows);
+      };
+      reader.readAsText(file);
+    }
+
+    // Preencher seleção de colunas
+    function populateColumnSelectors(data) {
+      columns = data[0];
+      const idColumnSelect = document.getElementById("idColumn");
+      const responsavelColumnSelect = document.getElementById("responsavelColumn");
+      
+      idColumnSelect.innerHTML = columns.map(col => `<option value="${col}">${col}</option>`).join("");
+      responsavelColumnSelect.innerHTML = columns.map(col => `<option value="${col}">${col}</option>`).join("");
+    }
+
+    // Comparar os CSVs
+    function compareCSVs() {
+      const idColumn = document.getElementById("idColumn").value;
+      const responsavelColumn = document.getElementById("responsavelColumn").value;
+
+      if (!idColumn || !responsavelColumn) {
+        alert("Por favor, selecione as colunas de ID e Responsável.");
+        return;
+      }
+
+      const flyingMap = new Map(flyingData.map(row => [row[columns.indexOf(idColumn)], row]));
+      const pipefyMap = new Map(pipefyData.map(row => [row[columns.indexOf(idColumn)], row]));
+
+      result = [];
+
+      pipefyMap.forEach((pipefyRow, id) => {
+        const flyingRow = flyingMap.get(id);
+        if (flyingRow && flyingRow[columns.indexOf(responsavelColumn)] !== pipefyRow[columns.indexOf(responsavelColumn)]) {
+          result.push({
+            ID: id,
+            Responsavel: pipefyRow[columns.indexOf(responsavelColumn)]
+          });
+        }
+      });
+
+      document.getElementById("log").innerText = `Comparação concluída. ${result.length} discrepâncias encontradas.`;
+    }
+
+    // Baixar o relatório
+    function downloadReport() {
+      if (result.length === 0) {
+        alert("Nenhuma discrepância encontrada para exportar.");
+        return;
+      }
+
+      const csvContent = "ID,Responsavel\n" + result.map(r => `${r.ID},${r.Responsavel}`).join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "relatorio_discrepancias.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // Carregar arquivos
+    document.getElementById("csv1").addEventListener("change", event => {
+      readCSV(event.target.files[0], data => {
+        flyingData = data.slice(1);
+        populateColumnSelectors(data);
+      });
+    });
+
+    document.getElementById("csv2").addEventListener("change", event => {
+      readCSV(event.target.files[0], data => {
+        pipefyData = data.slice(1);
+        populateColumnSelectors(data);
+      });
+    });
+  </script>
+</body>
+</html>
